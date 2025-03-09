@@ -8,10 +8,9 @@ CURRENT_GID := $(shell id -g)
 export CURRENT_UID
 export CURRENT_GID
 
-.PHONY: clean-builder clean-code clean all builder-down builder-rebuild run
+.PHONY: clean-builder clean-code clean builder-down run
 .DEFAULT_GOAL := build/crappasswd
 
-# DOCKER_CMD := docker run --env-file .env -h $(HOSTNAME) --rm -it --workdir /workspaces/crappasswd -v $(PWD):/workspaces/crappasswd --user $(CURRENT_UID):$(CURRENT_GID) $(project_name)-builder:latest
 DOCKER_CMD := docker compose up -d && docker compose exec crappasswd-builder
 
 ### Docker targets:
