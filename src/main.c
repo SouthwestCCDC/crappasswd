@@ -95,20 +95,41 @@ int main()
         print_and_quit(status);
     }
 
-    BerElement *ber = NULL;
-
-    char *attribute = ldap_first_attribute(ld, *res, &ber);
-    do
+    // Read the distinguishedName and store it as user_dn
+    char *user_dn = *ldap_get_values(ld, *res, "distinguishedName");
+    if (user_dn == NULL)
     {
-        char **values = ldap_get_values(ld, *res, attribute);
-        printf("%s:\n", attribute);
-        for (int i = 0; values[i] != NULL; i++)
-        {
-            printf(" %s\n", values[i]);
-        }
-        ldap_value_free(values);
-        attribute = ldap_next_attribute(ld, *res, ber);
-    } while (attribute);
+        printf("User not found\n");
+        print_and_quit(1);
+    }
+    printf("user_dn: %s\n", user_dn);
+
+    // Change the password
+    LDAPMod mod = {
+        .mod_op = LDAP_MOD_REPLACE,
+        .mod_type = "unicodePwd",
+        .mod_vals.modv_strvals = (char *[]){(char *)newpasswd, NULL},
+    };
+
+    LDAPMod *mods[] = {&mod, NULL};
+
+    status = ldap_modify_ext_s(
+        ld,
+        user_dn,
+        mods,
+        NULL,
+        NULL);
+
+    printf("modify status: %d: %s\n", status, ldap_err2string(status));
+    if (status != LDAP_SUCCESS)
+    {
+        print_and_quit(status);
+    }
+
+    // Clean up:
+
+    // Free the memory allocated by ldap_get_values
+    ldap_value_free(&user_dn);
 
     status = ldap_unbind_s(ld);
     printf("unbind status: %d: %s\n", status, ldap_err2string(status));
