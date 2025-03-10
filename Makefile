@@ -1,7 +1,5 @@
 project_name=crappasswd
-BASE_DIR:=$(realpath $(shell dirname $(firstword $(MAKEFILE_LIST))))
-IMAGES:=$(shell docker images $(project_name)-builder -a -q)
-
+IMAGES := $(shell docker images $(project_name)-builder -a -q)
 CURRENT_UID := $(shell id -u)
 CURRENT_GID := $(shell id -g)
 
@@ -11,26 +9,27 @@ export CURRENT_GID
 .PHONY: clean-builder clean-code clean builder-down run
 .DEFAULT_GOAL := build/crappasswd
 
-DOCKER_CMD := docker compose up -d && docker compose exec crappasswd-builder
+DOCKER_COMPOSE := docker compose -f .devcontainer/compose.yml
+DOCKER_CMD := $(DOCKER_COMPOSE) up -d && $(DOCKER_COMPOSE) exec crappasswd-builder
 
 ### Docker targets:
 
-builder-down: builder.Dockerfile compose.yml
-	docker compose down
+builder-down: .devcontainer/builder.Dockerfile .devcontainer/compose.yml
+	$(DOCKER_COMPOSE) down
 
-builder-run: builder.Dockerfile compose.yml
+builder-run: .devcontainer/builder.Dockerfile .devcontainer/compose.yml
 	$(DOCKER_CMD) /bin/bash
 
 ### Build target for crappasswd:
 
-build/crappasswd: src/main.c
+build/crappasswd: src/main.c CMakeLists.txt .devcontainer/builder.Dockerfile .devcontainer/compose.yml
 	$(DOCKER_CMD) /bin/bash -c "cmake -B build && cmake --build build"
 
 run: build/crappasswd
 	$(DOCKER_CMD) /bin/bash -c "./build/crappasswd"
 
 clean-builder:
-	docker compose down
+	$(DOCKER_COMPOSE) down
 ifeq ($(IMAGES),)
 	@echo "No images to remove"
 else

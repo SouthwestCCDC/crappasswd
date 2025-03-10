@@ -6,11 +6,11 @@ services:
             dockerfile: builder.Dockerfile
         container_name: crappasswd-builder
         env_file:
-            - .env
+            - ../.env
         stdin_open: true
         tty: true
         working_dir: /workspaces/crappasswd
         volumes:
-            - $PWD:/workspaces/crappasswd
-        user: ${CURRENT_UID}:${CURRENT_GID}
+            - ../:/workspaces/crappasswd
+        user: "${CURRENT_UID}:${CURRENT_GID}"
         image: crappasswd-builder:latest

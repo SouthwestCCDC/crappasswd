@@ -1,0 +1,49 @@
+// {
+//     "name": "C",
+//     "build": {
+//       "dockerfile": "../builder.Dockerfile"
+//     },
+//     "customizations": {
+//       "vscode": {
+//         "settings": {
+//           "terminal.integrated.defaultProfile.linux": "bash",
+//           "extensions.verifySignature": false
+//         },
+//         "extensions": ["ms-vscode.cpptools", "ms-vscode.cpptools-extension-pack", "ms-vscode.cmake-tools", "cschlosser.doxdocgen", "ms-azuretools.vscode-docker", 
+//                        "ms-vscode.makefile-tools", "ms-vscode.hexeditor"]
+//       }
+//     }
+//   }
+
+{
+  "dockerComposeFile": "compose.yml",
+  "service": "crappasswd-builder",
+  "workspaceFolder": "/workspaces/crappasswd",
+  "containerUser": "vscode",
+  
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "extensions.verifySignature": false
+      },
+      "extensions": ["ms-vscode.cpptools", "ms-vscode.cpptools-extension-pack", "ms-vscode.cmake-tools", "cschlosser.doxdocgen", "ms-azuretools.vscode-docker", 
+                      "ms-vscode.makefile-tools", "ms-vscode.hexeditor"]
+    }
+  }
+}
+
+// {
+//   "image": "crappasswd-builder",
+//   "runArgs": ["--env-file", ".env"],
+//   "customizations": {
+//     "vscode": {
+//       "settings": {
+//         "terminal.integrated.defaultProfile.linux": "bash",
+//         "extensions.verifySignature": false
+//       },
+//       "extensions": ["ms-vscode.cpptools", "ms-vscode.cpptools-extension-pack", "ms-vscode.cmake-tools", "cschlosser.doxdocgen", "ms-azuretools.vscode-docker", 
+//                       "ms-vscode.makefile-tools", "ms-vscode.hexeditor"]
+//     }
+//   }
+// }
