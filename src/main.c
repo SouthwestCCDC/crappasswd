@@ -66,9 +66,10 @@ int main()
         print_and_quit(status);
     }
 
-    char *ldap_search_str[255] = {
+    char ldap_search_str[255] = {
         0,
     };
+
     snprintf(ldap_search_str, 255, "(sAMAccountName=%s)", username); // TODO: maybe use dangerous sprintf
 
     status = ldap_search_ext_s(
@@ -89,6 +90,14 @@ int main()
     {
         print_and_quit(status);
     }
+
+    BerElement *ber = NULL;
+
+    int count = ldap_count_entries(ld, *res);
+    printf("count: %d\n", count);
+
+    char *attribute = ldap_first_attribute(ld, *res, &ber);
+    printf("attribute: %s\n", attribute);
 
     status = ldap_unbind_s(ld);
     printf("unbind status: %d: %s\n", status, ldap_err2string(status));
