@@ -13,6 +13,10 @@ int ldap_bind_s(LDAP *ld, const char *who, const char *cred, int method);
 /// Synchronoud LDAP unbind operation
 int ldap_unbind_s(LDAP *ld);
 
+char **ldap_get_values(LDAP *ld, LDAPMessage *entry, char *attr);
+
+void ldap_value_free(char **vals);
+
 /// Buffer for a single LDAP search result
 unsigned char ldap_search_result_buf[sizeof(LDAPMessage *)];
 LDAPMessage **res = (LDAPMessage **)ldap_search_result_buf;
@@ -77,7 +81,7 @@ int main()
         ldap_base,
         LDAP_SCOPE_SUBTREE,
         ldap_search_str,
-        NULL,
+        (char *[]){"distinguishedName", "mail", NULL},
         0,
         NULL,
         NULL,
@@ -93,11 +97,18 @@ int main()
 
     BerElement *ber = NULL;
 
-    int count = ldap_count_entries(ld, *res);
-    printf("count: %d\n", count);
-
     char *attribute = ldap_first_attribute(ld, *res, &ber);
-    printf("attribute: %s\n", attribute);
+    do
+    {
+        char **values = ldap_get_values(ld, *res, attribute);
+        printf("%s:\n", attribute);
+        for (int i = 0; values[i] != NULL; i++)
+        {
+            printf(" %s\n", values[i]);
+        }
+        ldap_value_free(values);
+        attribute = ldap_next_attribute(ld, *res, ber);
+    } while (attribute);
 
     status = ldap_unbind_s(ld);
     printf("unbind status: %d: %s\n", status, ldap_err2string(status));
