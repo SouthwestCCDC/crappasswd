@@ -1,5 +1,4 @@
-ARG base_tag=bullseye
-ARG base_img=mcr.microsoft.com/vscode/devcontainers/python:3.10-${base_tag}
+ARG base_img=mcr.microsoft.com/devcontainers/base:bullseye
 
 FROM ${base_img} AS builder-install
 
