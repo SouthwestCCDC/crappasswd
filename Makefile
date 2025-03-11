@@ -15,21 +15,21 @@ DOCKER_CMD := $(DOCKER_COMPOSE) up -d && $(DOCKER_COMPOSE) exec crappasswd-build
 ### Docker targets:
 
 builder-down: .devcontainer/builder.Dockerfile .devcontainer/compose.yml
-	$(DOCKER_COMPOSE) down
+	@$(DOCKER_COMPOSE) down
 
 builder-run: .devcontainer/builder.Dockerfile .devcontainer/compose.yml
-	$(DOCKER_CMD) /bin/bash
+	@$(DOCKER_CMD) /bin/bash
 
 ### Build target for crappasswd:
 
 build/crappasswd: src/main.c CMakeLists.txt .devcontainer/builder.Dockerfile .devcontainer/compose.yml
-	$(DOCKER_CMD) /bin/bash -c "cmake -B build && cmake --build build"
+	@$(DOCKER_CMD) /bin/bash -c "cmake -B build && cmake --build build"
 
 run: build/crappasswd
-	$(DOCKER_CMD) /bin/bash -c "./build/crappasswd"
+	@$(DOCKER_CMD) /bin/bash -c "./build/crappasswd"
 
 clean-builder:
-	$(DOCKER_COMPOSE) down
+	@$(DOCKER_COMPOSE) down
 ifeq ($(IMAGES),)
 	@echo "No images to remove"
 else
@@ -37,6 +37,6 @@ else
 endif
 
 clean-code:
-	rm -rf build/
+	@rm -rf build/
 
 clean: clean-code clean-builder
