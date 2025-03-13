@@ -1,4 +1,4 @@
-ARG base_img=mcr.microsoft.com/devcontainers/base:bullseye
+ARG base_img=mcr.microsoft.com/devcontainers/base:bookworm
 
 FROM ${base_img} AS builder-install
 
@@ -46,4 +46,5 @@ RUN ln -s /usr/bin/clang-tidy-${llvm_version} /usr/local/bin/clang-tidy
 RUN apt-get update --fix-missing && apt-get -y upgrade && apt-get install -y --no-install-recommends \
     libldap-dev \
     libssl-dev \
+    libcurl4-openssl-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*

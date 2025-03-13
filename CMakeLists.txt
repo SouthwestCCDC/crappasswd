@@ -32,6 +32,12 @@ target_link_libraries(
     ldap
 )
 
+# Link libcurl:
+target_link_libraries(
+    ${PROJECT_NAME}
+    curl
+)
+
 target_include_directories(
     ${PROJECT_NAME}
     PUBLIC

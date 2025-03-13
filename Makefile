@@ -6,7 +6,7 @@ CURRENT_GID := $(shell id -g)
 export CURRENT_UID
 export CURRENT_GID
 
-.PHONY: clean-builder clean-code clean builder-down run
+.PHONY: clean-builder clean-code clean builder-down run copy
 .DEFAULT_GOAL := build/crappasswd
 
 DOCKER_COMPOSE := docker compose -f .devcontainer/compose.yml
@@ -27,6 +27,9 @@ build/crappasswd: src/main.c CMakeLists.txt .devcontainer/builder.Dockerfile .de
 
 run: build/crappasswd
 	@$(DOCKER_CMD) /bin/bash -c "./build/crappasswd"
+
+copy: build/crappasswd
+	@cp build/crappasswd $(HOME)/swccdc/deployment/ansible/roles/2025/regionals/crappasswd/files/crappasswd
 
 clean-builder:
 	@$(DOCKER_COMPOSE) down
