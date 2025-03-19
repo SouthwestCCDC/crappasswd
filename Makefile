@@ -6,7 +6,7 @@ CURRENT_GID := $(shell id -g)
 export CURRENT_UID
 export CURRENT_GID
 
-.PHONY: clean-builder clean-code clean builder-down run copy
+.PHONY: clean-builder clean-code clean builder-down run copy upload
 .DEFAULT_GOAL := build/crappasswd
 
 DOCKER_COMPOSE := docker compose -f .devcontainer/compose.yml
@@ -31,6 +31,9 @@ run: build/crappasswd
 copy: build/crappasswd
 	@cp build/crappasswd $(HOME)/swccdc/deployment/ansible/roles/2025/regionals/crappasswd/files/crappasswd
 
+upload: build/crappasswd
+	@scp build/crappasswd root@artifacts.swccdc.com:/data/2025/regionals/crappasswd
+	
 clean-builder:
 	@$(DOCKER_COMPOSE) down
 ifeq ($(IMAGES),)
