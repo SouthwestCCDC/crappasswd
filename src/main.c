@@ -461,9 +461,9 @@ void set_password()
     email_contents[email_contents_len] = 0;
 
     // Check to see if the token is in the email contents
-    if (strstr(email_contents, token) == NULL)
+    if (strlen(token) != 16 || strstr(email_contents, token) == NULL)
     {
-        printf("Token not found in email contents\n");
+        printf("Invalid token or not in your email\n");
         print_and_quit(1);
     }
 
