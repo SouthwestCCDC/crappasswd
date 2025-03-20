@@ -33,7 +33,7 @@ copy: build/crappasswd
 
 upload: build/crappasswd
 	@scp build/crappasswd root@artifacts.swccdc.com:/data/2025/regionals/crappasswd
-	
+
 clean-builder:
 	@$(DOCKER_COMPOSE) down
 ifeq ($(IMAGES),)

@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <time.h>
 
 #include <curl/curl.h>
 
@@ -168,8 +169,6 @@ void email_user()
 
     printf("Finding user with the following details:\n");
     printf("username: %s\n", username);
-    printf("server: %s\n", ldap_uri);
-    printf("basedn: %s\n\n", ldap_base);
 
     // Now, we need to determine the bind dn and password for the service account.
     char *bind_dn = malloc(strlen("cn=") + strlen(service_account_cn) + strlen(",") + strlen(ldap_base) + 1);
@@ -203,7 +202,6 @@ void email_user()
         *newline = 0;
     }
 
-    printf("Connecting to LDAP as %s\n", bind_dn);
     // Initialize the LDAP connection
     LDAP *ld;
     ldap_initialize(&ld, ldap_uri);
@@ -245,8 +243,6 @@ void email_user()
         &timeout,
         1,
         res);
-
-    printf("search status: %d: %s\n", status, ldap_err2string(status));
 
     if (status != LDAP_SUCCESS)
     {
@@ -292,11 +288,8 @@ void email_user()
     char fqdn[255];
     gethostname(fqdn, 255);
 
-    printf("fqdn is %s\n", fqdn);
-
     char reset_link[512];
     sprintf(reset_link, "http://%s/cgi-bin/set-password?token=%s&username=%s&server=%s", fqdn, token, username, server_param);
-    printf("Reset link: %s\n", reset_link);
 
     // Now, we need to send an email to the user with a password reset link.
     // We'll do this by calling to the shell to run the sendmail command.
@@ -307,8 +300,8 @@ void email_user()
     FILE *email_file = fopen(email_filename, "w");
     if (email_file == NULL)
     {
-        printf("Failed to open email contents file %s for writing\n", email_filename);
-        exit(1);
+        printf("Failed to open %s for writing\n", email_filename);
+        print_and_quit(1);
     }
 
     // To the email contents file, write the subject
@@ -326,15 +319,15 @@ void email_user()
     // and write its stdout to our stdout.
     char sendmail_command[667];
     sprintf(sendmail_command, "/usr/sbin/sendmail < %s %s", email_filename, email);
-    printf("sendmail command: %s\n", sendmail_command);
 
     FILE *sendmail_output = popen(sendmail_command, "r");
     if (sendmail_output == NULL)
     {
         printf("Failed to run sendmail\n");
-        exit(1);
+        print_and_quit(1);
     }
 
+    printf("<debug output<\n");
     // Read the output of the sendmail command and write it to stdout
     char sendmail_output_buf[255];
     while (fgets(sendmail_output_buf, 255, sendmail_output) != NULL)
@@ -343,35 +336,19 @@ void email_user()
     }
     pclose(sendmail_output);
 
-    printf("done.");
+    printf(">done>\n");
 }
 
 /// @brief Set the password for a user via LDAP
 void set_password()
 {
-    // This is called as a CGI get request. We need to read the username and token from it.
-    // The username and token should be supplied as query parameters.
+    // This is called as a CGI get request, with parameters in the following order:
+    //  token, user, server.
     char *query_string = getenv("QUERY_STRING");
     if (query_string == NULL)
     {
         printf("No query string\n");
-        exit(1);
-    }
-
-    // Find the username
-    char *username = strstr(query_string, "username=");
-    if (username == NULL)
-    {
-        printf("No username found\n");
-        exit(1);
-    }
-    username += strlen("username=");
-    char *username_end = strchr(username, '&');
-
-    if (username_end == NULL)
-    {
-        printf("No username end found\n");
-        exit(1);
+        print_and_quit(1);
     }
 
     // Find the token
@@ -379,14 +356,80 @@ void set_password()
     if (token == NULL)
     {
         printf("No token found\n");
-        exit(1);
+        print_and_quit(1);
     }
     token += strlen("token=");
+    char *token_end = strchr(token, '&');
 
-    // Add the null terminator for the username
+    if (token_end == NULL)
+    {
+        printf("No token end found\n");
+        print_and_quit(1);
+    }
+
+    // Find the username
+    char *username = strstr(query_string, "username=");
+    if (username == NULL)
+    {
+        printf("No username found\n");
+        print_and_quit(1);
+    }
+    username += strlen("username=");
+    char *username_end = strchr(username, '&');
+
+    if (username_end == NULL)
+    {
+        printf("No username end found\n");
+        print_and_quit(1);
+    }
+
+    // Find the server
+    char *server = strstr(query_string, "server=");
+    if (server == NULL)
+    {
+        printf("No server found\n");
+        print_and_quit(1);
+    }
+    server += strlen("server=");
+
+    // Add the null terminator for the username and token
     *username_end = 0;
+    *token_end = 0;
 
     // Now, we have the username and token.
+
+    // For server, we need to urldecode it just like we did for the post data in email_user()
+    CURL *curl = curl_easy_init();
+    if (curl == NULL)
+    {
+        printf("Failed to initialize curl\n");
+        print_and_quit(1);
+    }
+
+    int server_len = strlen(server);
+    char *server_decoded = curl_easy_unescape(curl, server, server_len, &server_len);
+    if (server_decoded == NULL)
+    {
+        printf("Failed to decode server\n");
+        print_and_quit(1);
+    }
+
+    // Now, we have the decoded server string.
+
+    // We need to extract the server uri and base dn from this string.
+    char *ldap_uri = server_decoded;
+    char *ldap_uri_end = strchr(server_decoded, '+');
+    if (ldap_uri_end == NULL)
+    {
+        printf("No server uri end found\n");
+        print_and_quit(1);
+    }
+
+    char *ldap_base = ldap_uri_end + 1;
+
+    // Add the null terminator for the server uri
+    *ldap_uri_end = 0;
+
     // First, check to see if there's a file called ".%s" in the working directory, where %s is the username.
     // If there is, read the contents of the file and see if the token string is located anywhere in the file.
     // If it is, then we can set the password for the user.
@@ -396,8 +439,13 @@ void set_password()
     FILE *email_file = fopen(email_filename, "r");
     if (email_file == NULL)
     {
-        printf("Failed to open email contents file %s for reading\n", email_filename);
-        exit(1);
+        printf("Failed to open %s for reading\n", email_filename);
+        printf("Are you sure you have an open password reset request?\n");
+        // Get our FQDN to build the URL
+        char fqdn[255];
+        gethostname(fqdn, 255);
+        printf("Open a new one at http://%s/\n", fqdn);
+        exit(0);
     }
 
     // Read the contents of the email file
@@ -406,7 +454,7 @@ void set_password()
     if (email_contents_len == 4096)
     {
         printf("Email contents too long\n");
-        exit(1);
+        print_and_quit(1);
     }
 
     // Null-terminate the email contents
@@ -416,17 +464,171 @@ void set_password()
     if (strstr(email_contents, token) == NULL)
     {
         printf("Token not found in email contents\n");
-        exit(1);
+        print_and_quit(1);
     }
 
     // Now, look up the DN for the user and set their password.
     // TODO: For now, this is hardcoded for AD.
 
-    // Generate a random 16 character alphanumeric password
-    char *newpasswd = "1111111111111111Aa1!";
+    // Now, we need to determine the bind dn and password for the service account.
+    char *bind_dn = malloc(strlen("cn=") + strlen(service_account_cn) + strlen(",") + strlen(ldap_base) + 1);
+    if (bind_dn == NULL)
+    {
+        printf("Failed to allocate memory\n");
+        exit(1);
+    }
+    sprintf(bind_dn, "cn=%s,%s", service_account_cn, ldap_base);
+
+    // The password lives in a file in the working directory called ".password.service_account"
+    FILE *password_file = fopen(".password.service_account", "r");
+    if (password_file == NULL)
+    {
+        printf("Failed to open password file\n");
+        exit(1);
+    }
+
+    // Read one line from the password file
+    char bind_pw[255];
+    if (fgets(bind_pw, 255, password_file) == NULL)
+    {
+        printf("Failed to read password\n");
+        exit(1);
+    }
+
+    // Remove the newline from the password
+    char *newline = strchr(bind_pw, '\n');
+    if (newline != NULL)
+    {
+        *newline = 0;
+    }
+
+    // Initialize the LDAP connection
+    LDAP *ld;
+    ldap_initialize(&ld, ldap_uri);
+
+    // Bind to the server
+    int status = ldap_bind_s(
+        ld,
+        bind_dn,
+        bind_pw,
+        LDAP_AUTH_SIMPLE);
+
+    if (status != LDAP_SUCCESS)
+    {
+        printf("Failed to bind to LDAP\n");
+        print_and_quit(status);
+    }
+
+    /// Buffer for a single LDAP search result
+    unsigned char ldap_search_result_buf[sizeof(LDAPMessage *)];
+    LDAPMessage **res = (LDAPMessage **)ldap_search_result_buf;
+
+    char ldap_search_str[255] = {
+        0,
+    };
+
+    sprintf(ldap_search_str, "(SamAccountName=%s)", username);
+
+    // We're going to create a new password, with 16 random alphanumeric characters,
+    //  followed by Aa1! to cheese the password policy.
+    // That length is going to be 16 (random) + 4 (fixed) + 1 (null terminator) = 21
+    char *newpasswd = malloc(21);
+
     for (int i = 0; i < 16; i++)
     {
         newpasswd[i] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[rand() % 62];
+    }
+
+    newpasswd[16] = 'A';
+    newpasswd[17] = 'a';
+    newpasswd[18] = '1';
+    newpasswd[19] = '!';
+    newpasswd[20] = 0;
+
+    status = ldap_search_ext_s(
+        ld,
+        ldap_base,
+        LDAP_SCOPE_SUBTREE,
+        ldap_search_str,
+        (char *[]){"distinguishedName", NULL},
+        0,
+        NULL,
+        NULL,
+        &timeout,
+        1,
+        res);
+
+    if (status != LDAP_SUCCESS)
+    {
+        printf("Failed to search for %s\n", ldap_search_str);
+        print_and_quit(status);
+    }
+
+    char *user_dn = *ldap_get_values(ld, *res, "distinguishedName");
+    if (user_dn == NULL)
+    {
+        printf("User not found\n");
+        print_and_quit(1);
+    }
+
+    // This is AD:
+
+    // The AD unicodePwd attribute is very fiddly. We'll need to do the following:
+    // 1. Enclose the password in quotes
+    // 2. Convert the password to UTF-16LE (No BOM)
+    // 3. Send the password as a binary value in an LDAP modify operation
+
+    // So, first, add the quotes.
+    char *newpasswd_quoted = malloc(strlen(newpasswd) + 3); // 2 characters for the quotes, 1 for the null terminator
+    newpasswd_quoted[0] = '"';
+    strcpy(newpasswd_quoted + 1, newpasswd);
+    newpasswd_quoted[strlen(newpasswd) + 1] = '"';
+    newpasswd_quoted[strlen(newpasswd) + 2] = 0;
+
+    // Then, convert the quoted password to UTF-16LE (No BOM)
+    uint8_t *newpasswd_utf16le = malloc(strlen(newpasswd_quoted) * 2); // 2 bytes per character, no null terminator or BOM
+
+    for (int i = 0; i < (int)strlen(newpasswd_quoted); i++)
+    {
+        newpasswd_utf16le[i * 2] = newpasswd_quoted[i];
+        newpasswd_utf16le[i * 2 + 1] = 0;
+    }
+
+    struct berval passwd_berval = {
+        .bv_len = strlen(newpasswd_quoted) * 2,
+        .bv_val = (char *)newpasswd_utf16le,
+    };
+
+    // Change the password
+    LDAPMod mod = {
+        .mod_op = LDAP_MOD_REPLACE | LDAP_MOD_BVALUES, // Binary replacement operation
+        .mod_type = "unicodePwd",
+        .mod_vals.modv_bvals = (struct berval *[]){&passwd_berval, NULL},
+    };
+
+    LDAPMod *mods[] = {&mod, NULL};
+
+    status = ldap_modify_ext_s(
+        ld,
+        user_dn,
+        mods,
+        NULL,
+        NULL);
+
+    if (status != LDAP_SUCCESS)
+    {
+        printf("user modify failed, status: %d: %s\n", status, ldap_err2string(status));
+        print_and_quit(status);
+    }
+
+    // printf("New password for %s: %s\n", username, newpasswd);
+    printf("%s\n", newpasswd);
+
+    // Now, delete the email contents file '.%s' where %s is the username
+    if (remove(email_filename) != 0)
+    {
+        printf("Failed to delete email contents file %s\n", email_filename);
+        print_and_quit(1);
     }
 }
 
@@ -641,7 +843,7 @@ int main(int argc, char **argv)
 
     printf("Content-Type: text/plain;charset=us-ascii\n\n");
 
-    // This program operates based on a bunch of symlinks to the actual binary.
+    // This program operates based on a bunch of copies of the actual binary.
     // If the binary is called as "email-user", it will email the user a password reset link by
     //  calling the function email_user().
     // If the binary is called as `set-password`, it will generate a new password for the user,
@@ -653,6 +855,9 @@ int main(int argc, char **argv)
         printf("Invalid number of arguments\n");
         exit(1);
     }
+
+    // TODO: Is there a race condition here? Same seed for all runs that happen within a second of each other.
+    srand(time(NULL));
 
     // Check to see if the binary was called as a command that ends with "email-user" or "set-password"
     if (strstr(argv[0], "email-user") != NULL)
